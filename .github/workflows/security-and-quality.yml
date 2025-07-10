@@ -25,20 +25,31 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
+    needs: lint
+    if: |
+      github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+      - name: Check for supported code
+        id: codeql-check
+        run: |
+          if ls *.js *.ts *.py 1> /dev/null 2>&1; then
+            echo "::set-output name=run_codeql::true"
+          else
+            echo "::set-output name=run_codeql::false"
+          fi
       - uses: github/codeql-action/init@v3
+        if: steps.codeql-check.outputs.run_codeql == 'true'
         with:
           languages: 'javascript,python'
       - uses: github/codeql-action/analyze@v3
+        if: steps.codeql-check.outputs.run_codeql == 'true'
 
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    needs: codeql
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
@@ -46,6 +57,7 @@ jobs:
   secret-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
+    needs: dependency-review
     steps:
       - uses: actions/checkout@v4
       - uses: trufflesecurity/trufflehog@v3
@@ -53,6 +65,7 @@ jobs:
   license-check:
     name: License Check
     runs-on: ubuntu-latest
+    needs: secret-scan
     steps:
       - uses: actions/checkout@v4
       - uses: pilosus/action-license-checker@v1
@@ -60,6 +73,7 @@ jobs:
   bandit:
     name: Python Security (Bandit)
     runs-on: ubuntu-latest
+    needs: license-check
     steps:
       - uses: actions/checkout@v4
       - name: Run Bandit
@@ -74,6 +88,7 @@ jobs:
   trivy:
     name: Trivy Vulnerability Scanner
     runs-on: ubuntu-latest
+    needs: bandit
     steps:
       - uses: actions/checkout@v4
       - name: Run Trivy FS scan
