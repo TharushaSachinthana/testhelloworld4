@@ -60,7 +60,7 @@ jobs:
     needs: dependency-review
     steps:
       - uses: actions/checkout@v4
-      - uses: trufflesecurity/trufflehog@v3
+      - uses: trufflesecurity/trufflehog@main
 
   license-check:
     name: License Check
